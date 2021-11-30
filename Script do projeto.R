@@ -8,5 +8,9 @@ rename()
 #segunda parte
 select()
 
-# terceira parte]
+# terceira parte
 join()
+
+#quarta parte
+#alterações remotas
+#novos comandos
