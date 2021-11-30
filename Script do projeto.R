@@ -6,5 +6,7 @@ rename()
 
 #novas linhas de comando
 #segunda parte
-join()
 select()
+
+# terceira parte]
+join()
