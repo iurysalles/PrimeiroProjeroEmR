@@ -308,6 +308,8 @@ test_data <- as.data.frame(scaled[-index,])
 # Criando os modelos
 #################################################################################
 
+
+###########################  Logístico Binário  ################################
 #criando o modelo logístico binário
 logistico_binario <- glm(formula = target~., 
                       data = train_data, 
@@ -316,6 +318,7 @@ logistico_binario <- glm(formula = target~.,
 logistico_binario <- step(object =  logistico_binario,
                            k = qchisq(p = 0.05, df = 1, lower.tail = FALSE))
 
+##########################  Árvores de decisão #################################
 
 #criando o modelo de árvore
 tree_model <- rpart(target~., 
@@ -326,8 +329,12 @@ paleta = scales::viridis_pal(begin=.75, end=1)(20)
 rpart.plot::rpart.plot(tree_model,
                        box.palette = paleta) # Paleta de cores
 
+########################## Random Forest #######################################
+
 #Criando o modelo "Random Forest""
 rf_model <- randomForest(target ~ ., data = train_data, ntree = 500)
+
+############################  XGBOOST  #########################################
 
 #Criando o modelo XgBoost
 xgb_model <- xgboost(target ~ ., data = as.matrix(train_data[, -ncol(train_data)]),label = train_data$target,  nrounds = 100, objective = "binary:logistic")
