@@ -1,5 +1,5 @@
 #carregando os pacotes
-pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret","lmtest")
+pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret","pROC")
 
 if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
   instalador <- pacotes[!pacotes %in% installed.packages()]
@@ -344,34 +344,114 @@ xgb_model <- xgboost(target ~ ., data = as.matrix(train_data[, -ncol(train_data)
 #################################################################################
 #Realizando as predições na base de teste  
 #################################################################################
-                 
-tree_pred <- predict(tree_model, newdata = test_data, type = "class")
 
 log_pred <- predict(logistico_binario, newdata = test_data, type = "response")
-#Assumimos como 1 probabilidade acima de 50% e 0 caso contrário
-log_pred <- ifelse(log_pred >= 0.5, 1, 0)
 
+tree_pred <- predict(tree_model, newdata = test_data, type = "prob")
+tree_pred <- tree_pred[,2]
 
 rf_pred <- predict(rf_model, newdata = test_data)
-#Assumimos como 1 probabilidade acima de 50% e 0 caso contrário
-rf_pred <- ifelse(rf_pred >= 0.5, 1, 0)
 
 xgb_pred <- predict(xgb_model, newdata = as.matrix(test_data[, -ncol(test_data)]))
-#Assumimos como 1 probabilidade acima de 50% e 0 caso contrário
-xgb_pred <- ifelse(xgb_pred >= 0.5, 1, 0)
+
 
 
 #################################################################################
 #Criando a matriz confusão para cada modelo
 #################################################################################
 
-matrizConfusaoTree <- confusionMatrix(data=factor(c(tree_pred)), reference = factor(c(test_data$target)))
+roc_logistico <- roc(response = test_data$target, 
+                 predictor = log_pred)
 
-matrizConfusaoLogisticoBinario <- confusionMatrix(data=factor(c(log_pred)), reference = factor(c(test_data$target)))
+roc_tree <- roc(response = test_data$target, 
+                     predictor = c(tree_pred))
 
-matrizConfusaoRandomForest <- confusionMatrix(data=factor(c(rf_pred)), reference = factor(c(test_data$target)))
 
-matrizConfusaoXgb <- confusionMatrix(data=factor(c(xgb_pred)), reference = factor(c(test_data$target)))
+roc_rf <- roc(response = test_data$target, 
+           predictor = rf_pred)
+
+roc_xg <- roc(response = test_data$target, 
+              predictor = xgb_pred)
+
+ggplotly(
+  ggroc(roc_tree, color = "#440154FF", size = 1) +
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="grey40",
+                 size = 0.2) +
+    labs(x = "Especificidade",
+         y = "Sensitividade",
+         title = paste("Área abaixo da curva:",
+                       round(roc_tree$auc, 3),
+                       "|",
+                       "Coeficiente de Gini",
+                       round((roc_tree$auc[1] - 0.5) / 0.5, 3))) +
+    theme_bw()
+)
+
+
+ggplotly(
+  ggroc(roc_logistico, color = "#440154FF", size = 1) +
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="grey40",
+                 size = 0.2) +
+    labs(x = "Especificidade",
+         y = "Sensitividade",
+         title = paste("Área abaixo da curva:",
+                       round(roc_logistico$auc, 3),
+                       "|",
+                       "Coeficiente de Gini",
+                       round((roc_logistico$auc[1] - 0.5) / 0.5, 3))) +
+    theme_bw()
+)
+
+
+ggplotly(
+  ggroc(roc_rf, color = "#440154FF", size = 1) +
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="grey40",
+                 size = 0.2) +
+    labs(x = "Especificidade",
+         y = "Sensitividade",
+         title = paste("Área abaixo da curva:",
+                       round(roc_rf$auc, 3),
+                       "|",
+                       "Coeficiente de Gini",
+                       round((roc_rf$auc[1] - 0.5) / 0.5, 3))) +
+    theme_bw()
+)
+
+
+ggplotly(
+  ggroc(roc_xg, color = "#440154FF", size = 1) +
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="grey40",
+                 size = 0.2) +
+    labs(x = "Especificidade",
+         y = "Sensitividade",
+         title = paste("Área abaixo da curva:",
+                       round(roc_xg$auc, 3),
+                       "|",
+                       "Coeficiente de Gini",
+                       round((roc_xg$auc[1] - 0.5) / 0.5, 3))) +
+    theme_bw()
+)
+
+log_pred_threshold <- ifelse(log_pred >= 0.5, 1, 0)
+
+tree_pred_threshold <- ifelse(tree_pred >= 0.5, 1, 0)
+
+rf_pred_threshold <- ifelse(rf_pred >= 0.5, 1, 0)
+xgb_pred_threshold <- ifelse(xgb_pred >= 0.5, 1, 0)
+
+
+
+matrizConfusaoLogisticoBinario <- confusionMatrix(data=factor(c(log_pred_threshold)), reference = factor(c(test_data$target)))
+
+matrizConfusaoTree <- confusionMatrix(data=factor(c(tree_pred_threshold)), reference = factor(c(test_data$target)))
+
+matrizConfusaoRandomForest <- confusionMatrix(data=factor(c(rf_pred_threshold)), reference = factor(c(test_data$target)))
+
+matrizConfusaoXgb <- confusionMatrix(data=factor(c(xgb_pred_threshold)), reference = factor(c(test_data$target)))
 
 #################################################################################
 #Plotando as informações da matriz de confusão
