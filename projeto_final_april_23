@@ -47,7 +47,7 @@ open_month <- behavior %>%
 
 #join das bases
 base_mergeada <- left_join(applications, open_month,
-                            by = "ID")
+                           by = "ID")
 applications <- base_mergeada
 
 #Verificando população por genero
@@ -312,18 +312,18 @@ test_data <- as.data.frame(scaled[-index,])
 ###########################  Logístico Binário  ################################
 #criando o modelo logístico binário
 logistico_binario <- glm(formula = target~., 
-                      data = train_data, 
-                      family = "binomial")
+                         data = train_data, 
+                         family = "binomial")
 #aplicando stepwise
 logistico_binario <- step(object =  logistico_binario,
-                           k = qchisq(p = 0.05, df = 1, lower.tail = FALSE))
+                          k = qchisq(p = 0.05, df = 1, lower.tail = FALSE))
 
 ##########################  Árvores de decisão #################################
 
 #criando o modelo de árvore
 tree_model <- rpart(target~., 
-              data=train_data,
-              control=rpart.control(maxdepth = 5, cp=0), method="class")
+                    data=train_data,
+                    control=rpart.control(maxdepth = 5, cp=0), method="class")
 #visualizando a árvore
 paleta = scales::viridis_pal(begin=.75, end=1)(20)
 rpart.plot::rpart.plot(tree_model,
@@ -357,21 +357,25 @@ xgb_pred <- predict(xgb_model, newdata = as.matrix(test_data[, -ncol(test_data)]
 
 
 #################################################################################
-#Criando a matriz confusão para cada modelo
+#Calculando curva ROC para cada modelo
 #################################################################################
 
 roc_logistico <- roc(response = test_data$target, 
-                 predictor = log_pred)
+                     predictor = log_pred)
 
 roc_tree <- roc(response = test_data$target, 
-                     predictor = c(tree_pred))
+                predictor = c(tree_pred))
 
 
 roc_rf <- roc(response = test_data$target, 
-           predictor = rf_pred)
+              predictor = rf_pred)
 
 roc_xg <- roc(response = test_data$target, 
               predictor = xgb_pred)
+
+#################################################################################
+#Plotando curva ROC para cada modelo
+#################################################################################
 
 ggplotly(
   ggroc(roc_tree, color = "#440154FF", size = 1) +
@@ -436,13 +440,16 @@ ggplotly(
     theme_bw()
 )
 
+
+#################################################################################
+#Criando a matriz confusão para cada modelo
+#################################################################################
+
+
 log_pred_threshold <- ifelse(log_pred >= 0.5, 1, 0)
-
 tree_pred_threshold <- ifelse(tree_pred >= 0.5, 1, 0)
-
 rf_pred_threshold <- ifelse(rf_pred >= 0.5, 1, 0)
 xgb_pred_threshold <- ifelse(xgb_pred >= 0.5, 1, 0)
-
 
 
 matrizConfusaoLogisticoBinario <- confusionMatrix(data=factor(c(log_pred_threshold)), reference = factor(c(test_data$target)))
@@ -456,6 +463,7 @@ matrizConfusaoXgb <- confusionMatrix(data=factor(c(xgb_pred_threshold)), referen
 #################################################################################
 #Plotando as informações da matriz de confusão
 #################################################################################
+
 matrizConfusaoTree
 
 matrizConfusaoLogisticoBinario
