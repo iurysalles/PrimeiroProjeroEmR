@@ -1,5 +1,5 @@
 #carregando os pacotes
-pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret")
+pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret","lmtest")
 
 if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
   instalador <- pacotes[!pacotes %in% installed.packages()]
@@ -14,6 +14,11 @@ if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
 #carregando as bases
 applications <- read.csv("/Users/iurysalles/Desktop/MBA DATA SCIENCE/TCC/Projeto Final/Dataset/application_record.csv")
 behavior <- read.csv("/Users/iurysalles/Desktop/MBA DATA SCIENCE/TCC/Projeto Final/Dataset/credit_record.csv")
+
+
+#################################################################################
+# Análise dos dados e informações
+#################################################################################
 
 #entendendo a estrutura das informações
 head(applications)
@@ -104,6 +109,11 @@ applications <- applications[!duplicated(applications$ID),]
 #removendo coluna "OCCUPATION_TYPE" que tem missing values
 applications$OCCUPATION_TYPE = NULL
 
+
+#################################################################################
+# Tratamento e organização dos dados/informações
+#################################################################################
+
 #tranformando Code gender em campo numérico
 applications = applications %>% mutate(MALE = case_when(CODE_GENDER=="M" ~ 1, TRUE ~ 0))
 applications$CODE_GENDER = NULL
@@ -151,8 +161,6 @@ applications$DAYS_EMPLOYED = NULL
 #Convertendo DAYS_BIRTH para anos de idade
 applications$Age = round((applications$DAYS_BIRTH/365)*-1)
 applications$DAYS_BIRTH = NULL
-
-head(applications)
 
 other_numerical_cols <- c("Income", "Age", "Experience", "Family_Member_Count")
 
@@ -241,9 +249,7 @@ fig
 
 
 
-#####################--------------
-
-#Criando a variável target "bad_payer""
+#Criando a variável target "bad_payer"(Mal pagador)
 behavior$bad_payer <- NA
 
 #Todos com status entre 2 e 5 são considerados bad_payers
@@ -258,7 +264,7 @@ grouped_base <- behavior %>%
   select(bad_payer,ID)
 
 
-# merge customer_apps_1(variáveis de predição) com grouped_base(target)
+# merge customer_apps (variáveis de predição) com grouped_base(target)
 customer_apps <- inner_join(applications, grouped_base, by = "ID")
 # Transformando target em variável numérica
 customer_apps$target <- ifelse(customer_apps$bad_payer == "Yes", 1, 0)
@@ -289,6 +295,7 @@ index = sample(1:nrow(scaled),round(0.70*nrow(scaled)))
 #Selecionando a base de treino (70% da base)
 train_data <- as.data.frame(scaled[index,])
 
+#balanceando a base de treino
 balanced_data <- ovun.sample(target ~ ., data = train_data, method = "under", seed = 1)$data
 train_data <- balanced_data
 table(train_data$target)
@@ -297,11 +304,9 @@ table(train_data$target)
 #Selecionando a base de teste
 test_data <- as.data.frame(scaled[-index,])
 
-#Visualizando a base de teste
-head(train_data)
-
-#entendendo a distribuição
-table(train_data$target)
+#################################################################################
+# Criando os modelos
+#################################################################################
 
 #criando o modelo logístico binário
 logistico_binario <- glm(formula = target~., 
@@ -328,7 +333,11 @@ rf_model <- randomForest(target ~ ., data = train_data, ntree = 500)
 xgb_model <- xgboost(target ~ ., data = as.matrix(train_data[, -ncol(train_data)]),label = train_data$target,  nrounds = 100, objective = "binary:logistic")
 
 
-#Realizando as predições na base de teste                   
+
+#################################################################################
+#Realizando as predições na base de teste  
+#################################################################################
+                 
 tree_pred <- predict(tree_model, newdata = test_data, type = "class")
 
 log_pred <- predict(logistico_binario, newdata = test_data, type = "response")
@@ -345,7 +354,10 @@ xgb_pred <- predict(xgb_model, newdata = as.matrix(test_data[, -ncol(test_data)]
 xgb_pred <- ifelse(xgb_pred >= 0.5, 1, 0)
 
 
+#################################################################################
 #Criando a matriz confusão para cada modelo
+#################################################################################
+
 matrizConfusaoTree <- confusionMatrix(data=factor(c(tree_pred)), reference = factor(c(test_data$target)))
 
 matrizConfusaoLogisticoBinario <- confusionMatrix(data=factor(c(log_pred)), reference = factor(c(test_data$target)))
@@ -354,16 +366,9 @@ matrizConfusaoRandomForest <- confusionMatrix(data=factor(c(rf_pred)), reference
 
 matrizConfusaoXgb <- confusionMatrix(data=factor(c(xgb_pred)), reference = factor(c(test_data$target)))
 
-#Analisando a métrica KS para cada modelo
-ks.test(tree_pred, train_data$target)
-
-ks.test(log_pred, train_data$target)
-
-ks.test(rf_pred, train_data$target)
-
-ks.test(xgb_pred, test_data$target)
-
-
+#################################################################################
+#Plotando as informações da matriz de confusão
+#################################################################################
 matrizConfusaoTree
 
 matrizConfusaoLogisticoBinario
