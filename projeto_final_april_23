@@ -1,5 +1,5 @@
 #carregando os pacotes
-pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret","pROC")
+pacotes <- c("tidyverse","randomForest","plotly","dplyr","ROSE","rpart","xgboost","caret","pROC","ROCR")
 
 if(sum(as.numeric(!pacotes %in% installed.packages())) != 0){
   instalador <- pacotes[!pacotes %in% installed.packages()]
@@ -357,8 +357,10 @@ xgb_pred <- predict(xgb_model, newdata = as.matrix(test_data[, -ncol(test_data)]
 
 
 #################################################################################
-#Calculando curva ROC para cada modelo
+#Curva ROC para cada modelo
 #################################################################################
+
+#Cálculo da curva ROC 
 
 roc_logistico <- roc(response = test_data$target, 
                      predictor = log_pred)
@@ -373,24 +375,9 @@ roc_rf <- roc(response = test_data$target,
 roc_xg <- roc(response = test_data$target, 
               predictor = xgb_pred)
 
-#################################################################################
-#Plotando curva ROC para cada modelo
-#################################################################################
 
-ggplotly(
-  ggroc(roc_tree, color = "#440154FF", size = 1) +
-    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
-                 color="grey40",
-                 size = 0.2) +
-    labs(x = "Especificidade",
-         y = "Sensitividade",
-         title = paste("Área abaixo da curva:",
-                       round(roc_tree$auc, 3),
-                       "|",
-                       "Coeficiente de Gini",
-                       round((roc_tree$auc[1] - 0.5) / 0.5, 3))) +
-    theme_bw()
-)
+#Plotando curva ROC para cada modelo
+
 
 
 ggplotly(
@@ -407,6 +394,22 @@ ggplotly(
                        round((roc_logistico$auc[1] - 0.5) / 0.5, 3))) +
     theme_bw()
 )
+
+ggplotly(
+  ggroc(roc_tree, color = "#440154FF", size = 1) +
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="grey40",
+                 size = 0.2) +
+    labs(x = "Especificidade",
+         y = "Sensitividade",
+         title = paste("Área abaixo da curva:",
+                       round(roc_tree$auc, 3),
+                       "|",
+                       "Coeficiente de Gini",
+                       round((roc_tree$auc[1] - 0.5) / 0.5, 3))) +
+    theme_bw()
+)
+
 
 
 ggplotly(
@@ -440,18 +443,140 @@ ggplotly(
     theme_bw()
 )
 
+#########################################################################################
+#Análise de sensibilidade/especificidade para definição do melhor cutoff para cada modelo
+#########################################################################################
+
+predicoesLog <- prediction(predictions = log_pred, 
+                        labels = test_data$target) 
+
+predicoesTree <- prediction(predictions = tree_pred, 
+                                 labels = test_data$target) 
+
+predicoesRf <- prediction(predictions = rf_pred, 
+                                 labels = test_data$target) 
+
+predicoesXgb <- prediction(predictions = xgb_pred, 
+                                 labels = test_data$target) 
+
+
+dados_curva_roc_log <- performance(predicoesLog, measure = "sens") 
+dados_curva_roc_tree <- performance(predicoesTree, measure = "sens") 
+dados_curva_roc_rf <- performance(predicoesRf, measure = "sens") 
+dados_curva_roc_xgb <- performance(predicoesXgb, measure = "sens") 
+
+
+sensitividadeLog <- dados_curva_roc_log@y.values[[1]] 
+sensitividadeTree <- dados_curva_roc_tree@y.values[[1]] 
+sensitividadeRf <- dados_curva_roc_rf@y.values[[1]] 
+sensitividadeXgb <- dados_curva_roc_xgb@y.values[[1]] 
+
+
+especificidadeLog <- performance(predicoesLog, measure = "spec") 
+especificidadeTree <- performance(predicoesTree, measure = "spec")
+especificidadeRf <- performance(predicoesRf, measure = "spec")
+especificidadeXgb <- performance(predicoesXgb, measure = "spec")
+
+especificidadeLog <- especificidadeLog@y.values[[1]]
+especificidadeTree <- especificidadeTree@y.values[[1]]
+especificidadeRf <- especificidadeRf@y.values[[1]]
+especificidadeXgb <- especificidadeXgb@y.values[[1]]
+
+cutoffsLog <- dados_curva_roc_log@x.values[[1]] 
+cutoffsTree <- dados_curva_roc_tree@x.values[[1]] 
+cutoffsRf <- dados_curva_roc_rf@x.values[[1]] 
+cutoffsXgb <- dados_curva_roc_xgb@x.values[[1]] 
+
+dados_plotagemLog <- cbind.data.frame(cutoffsLog, especificidadeLog, sensitividadeLog)
+dados_plotagemTree <- cbind.data.frame(cutoffsTree, especificidadeTree, sensitividadeTree)
+dados_plotagemRf <- cbind.data.frame(cutoffsRf, especificidadeRf, sensitividadeRf)
+dados_plotagemXgb <- cbind.data.frame(cutoffsXgb, especificidadeXgb, sensitividadeXgb)
+
+ggplotly(dados_plotagemLog %>%
+           ggplot(aes(x = cutoffsLog, y = especificidadeLog)) +
+           geom_line(aes(color = "Especificidade"),
+                     size = 1) +
+           geom_point(color = "#95D840FF",
+                      size = 1.9) +
+           geom_line(aes(x = cutoffsLog, y = sensitividadeLog, color = "Sensitividade"),
+                     size = 1) +
+           geom_point(aes(x = cutoffsLog, y = sensitividadeLog),
+                      color = "#440154FF",
+                      size = 1.9) +
+           labs(x = "Cutoff",
+                y = "Sensitividade/Especificidade") +
+           scale_color_manual("Legenda:",
+                              values = c("#95D840FF", "#440154FF")) +
+           theme_bw())
+
+
+ggplotly(dados_plotagemTree %>%
+           ggplot(aes(x = cutoffsTree, y = especificidadeTree)) +
+           geom_line(aes(color = "Especificidade"),
+                     size = 1) +
+           geom_point(color = "#95D840FF",
+                      size = 1.9) +
+           geom_line(aes(x = cutoffsTree, y = sensitividadeTree, color = "Sensitividade"),
+                     size = 1) +
+           geom_point(aes(x = cutoffsTree, y = sensitividadeTree),
+                      color = "#440154FF",
+                      size = 1.9) +
+           labs(x = "Cutoff",
+                y = "Sensitividade/Especificidade") +
+           scale_color_manual("Legenda:",
+                              values = c("#95D840FF", "#440154FF")) +
+           theme_bw())
+
+
+ggplotly(dados_plotagemRf %>%
+           ggplot(aes(x = cutoffsRf, y = especificidadeRf)) +
+           geom_line(aes(color = "Especificidade"),
+                     size = 1) +
+           geom_point(color = "#95D840FF",
+                      size = 1.9) +
+           geom_line(aes(x = cutoffsRf, y = sensitividadeRf, color = "Sensitividade"),
+                     size = 1) +
+           geom_point(aes(x = cutoffsRf, y = sensitividadeRf),
+                      color = "#440154FF",
+                      size = 1.9) +
+           labs(x = "Cutoff",
+                y = "Sensitividade/Especificidade") +
+           scale_color_manual("Legenda:",
+                              values = c("#95D840FF", "#440154FF")) +
+           theme_bw())
+
+
+ggplotly(dados_plotagemXgb %>%
+           ggplot(aes(x = cutoffsXgb, y = especificidadeXgb)) +
+           geom_line(aes(color = "Especificidade"),
+                     size = 1) +
+           geom_point(color = "#95D840FF",
+                      size = 1.9) +
+           geom_line(aes(x = cutoffsXgb, y = sensitividadeXgb, color = "Sensitividade"),
+                     size = 1) +
+           geom_point(aes(x = cutoffsXgb, y = sensitividadeXgb),
+                      color = "#440154FF",
+                      size = 1.9) +
+           labs(x = "Cutoff",
+                y = "Sensitividade/Especificidade") +
+           scale_color_manual("Legenda:",
+                              values = c("#95D840FF", "#440154FF")) +
+           theme_bw())
+
 
 #################################################################################
 #Criando a matriz confusão para cada modelo
 #################################################################################
 
 
+#Calculando predições com base no cutoff elencado nas análises logo acima
 log_pred_threshold <- ifelse(log_pred >= 0.5, 1, 0)
-tree_pred_threshold <- ifelse(tree_pred >= 0.5, 1, 0)
+tree_pred_threshold <- ifelse(tree_pred >= 0.6, 1, 0)
 rf_pred_threshold <- ifelse(rf_pred >= 0.5, 1, 0)
 xgb_pred_threshold <- ifelse(xgb_pred >= 0.5, 1, 0)
 
 
+#Calculando as matrizes de confusão
 matrizConfusaoLogisticoBinario <- confusionMatrix(data=factor(c(log_pred_threshold)), reference = factor(c(test_data$target)))
 
 matrizConfusaoTree <- confusionMatrix(data=factor(c(tree_pred_threshold)), reference = factor(c(test_data$target)))
@@ -460,9 +585,7 @@ matrizConfusaoRandomForest <- confusionMatrix(data=factor(c(rf_pred_threshold)),
 
 matrizConfusaoXgb <- confusionMatrix(data=factor(c(xgb_pred_threshold)), reference = factor(c(test_data$target)))
 
-#################################################################################
-#Plotando as informações da matriz de confusão
-#################################################################################
+#Visualizando as informações da matriz de confusão
 
 matrizConfusaoTree
 
